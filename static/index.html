@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 
+      Contexto de Negocio: LexScribe Jurídico.
+      Un estudio de abogados que graba testimonios, declaraciones y memos de voz. 
+      Necesitan una herramienta segura y rápida para tener las transcripciones litigiables al instante 
+      para la búsqueda de términos clave durante la preparación de sus casos.
+    -->
+    <title>LexScribe - Transcriptor Legal Jurídico</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-navy">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="#">
+                <i class="bi bi-bank fs-3 me-2 text-gold"></i>
+                <span class="brand-text">LexScribe Jurídico</span>
+            </a>
+            <button class="btn btn-outline-light ms-auto" id="theme-toggle">
+                <i class="bi bi-moon-stars"></i> Modo Oscuro
+            </button>
+        </div>
+    </nav>
+
+    <div class="container my-5 main-container">
+        <!-- Encabezado -->
+        <div class="text-center mb-5 fade-in">
+            <h1 class="display-5 fw-bold">Transcripción lista para tu expediente</h1>
+            <p class="lead text-muted">De la declaración grabada al insight legal en segundos. Sube la declaración o graba un memo rápido para adjuntar al caso.</p>
+        </div>
+
+        <div class="row g-4">
+            <!-- Zona de Carga -->
+            <div class="col-lg-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body p-4 d-flex flex-column">
+                        <h4 class="card-title mb-4"><i class="bi bi-cloud-arrow-up text-gold me-2"></i>Nueva Transcripción</h4>
+                        
+                        <!-- Drag and Drop Zone -->
+                        <div id="drop-zone" class="drop-zone mb-3 text-center p-5 rounded">
+                            <i class="bi bi-file-earmark-music display-4 text-muted mb-3"></i>
+                            <p class="mb-1">Arrastra tu declaración grabada (.wav, .mp3)</p>
+                            <p class="text-muted small">o haz clic para seleccionar del expediente</p>
+                            <input type="file" id="file-input" accept=".wav,.mp3" class="d-none">
+                            <button class="btn btn-outline-primary mt-2" onclick="document.getElementById('file-input').click()">Explorar archivos</button>
+                        </div>
+                        
+                        <!-- File Info -->
+                        <div id="file-info" class="alert alert-secondary d-none d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-file-earmark-check fs-4 me-2 text-success"></i>
+                                <div>
+                                    <div id="file-name" class="fw-medium text-truncate" style="max-width: 200px;"></div>
+                                    <div id="file-size" class="text-muted small"></div>
+                                </div>
+                            </div>
+                            <button class="btn-close" id="btn-remove-file" aria-label="Close"></button>
+                        </div>
+
+                        <!-- Record Audio -->
+                        <div class="text-center my-3">
+                            <span class="text-muted small text-uppercase fw-bold">O toma nota de voz ahora</span>
+                        </div>
+                        <div class="d-grid gap-2 mb-4">
+                            <button id="btn-record" class="btn btn-danger-soft">
+                                <i class="bi bi-mic-fill me-2"></i>Grabar Testimonio en Vivo
+                            </button>
+                            <div id="recording-indicator" class="d-none text-danger mt-2 text-center p-2 rounded" style="background-color: rgba(220,53,69,0.1);">
+                                <i class="bi bi-record-circle recording-pulse me-1"></i> Grabando... <span id="recording-time" class="fw-bold">00:00</span>
+                                <button id="btn-stop" class="btn btn-sm btn-outline-danger ms-3">Detener y procesar</button>
+                            </div>
+                        </div>
+
+                        <div class="mt-auto">
+                            <button id="btn-transcribe" class="btn btn-primary w-100 py-3 fw-bold btn-lg shadow-sm" disabled>
+                                <i class="bi bi-magic me-2"></i>Transcribir al Expediente
+                            </button>
+                            <!-- Spinner -->
+                            <div id="loading-area" class="d-none text-center mt-3 p-3 rounded bg-transparent border">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Procesando...</span>
+                                </div>
+                                <p class="mt-2 text-primary fw-medium mb-0">Analizando el audio con IA legal (Whisper ONNX)...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zona de Resultados -->
+            <div class="col-lg-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body p-4 d-flex flex-column">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h4 class="card-title mb-0"><i class="bi bi-card-text text-gold me-2"></i>Resultado de la sesión</h4>
+                            <button id="btn-copy" class="btn btn-sm btn-outline-secondary d-none" title="Copiar al portapapeles">
+                                <i class="bi bi-clipboard"></i> Copiar texto
+                            </button>
+                        </div>
+
+                        <!-- Result Area -->
+                        <div id="result-box" class="result-box rounded p-4 flex-grow-1 border text-muted d-flex align-items-center justify-content-center text-center shadow-inner">
+                            Aquí aparecerá la transcripción literal del audio, lista para ser citada o analizada.
+                        </div>
+
+                        <!-- Alert -->
+                        <div id="alert-message" class="alert d-none mt-3 mb-0" role="alert"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Historial -->
+        <div class="mt-5 pt-3 border-top">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4><i class="bi bi-clock-history me-2"></i>Historial Reciente (Local)</h4>
+                <button id="btn-clear-history" class="btn btn-sm btn-outline-danger">Limpiar Registro</button>
+            </div>
+            <div class="card shadow-sm border-0">
+                <ul class="list-group list-group-flush" id="history-list">
+                    <!-- History items injected via JS -->
+                    <li class="list-group-item text-center text-muted py-5" id="empty-history">
+                        <i class="bi bi-folder2-open display-6 mb-2 text-secondary"></i><br>
+                        No hay transcripciones recientes en esta sesión.
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-navy text-white text-center py-4 mt-5">
+        <div class="container">
+            <p class="mb-0">LexScribe Jurídico &copy; 2026. Procesamiento seguro y confidencial de pruebas.</p>
+            <div class="mt-2">
+                <a href="#" class="text-gold text-decoration-none mx-2 small"><i class="bi bi-shield-check"></i> Privacidad Cliente-Abogado</a>
+                <a href="#" class="text-gold text-decoration-none mx-2 small"><i class="bi bi-server"></i> API Whisper ONNX Core</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="app.js"></script>
+</body>
+</html>

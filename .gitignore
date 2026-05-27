@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+
+# ──────────────────────────────────────────────────────────
+# ⚠️  NUNCA subir archivos de modelo al repositorio.
+# ⚠️  Los archivos .onnx pesan cientos de MB y contienen
+# ⚠️  propiedad intelectual. El modelo se descarga de S3
+# ⚠️  en tiempo de ejecución.
+# ──────────────────────────────────────────────────────────
+*.onnx
+local_model/
