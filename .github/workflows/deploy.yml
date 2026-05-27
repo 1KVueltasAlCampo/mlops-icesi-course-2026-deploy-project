@@ -1,0 +1,131 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - dev
+      - prod
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  ECR_REPOSITORY: whisper-onnx-api
+
+jobs:
+  test_model:
+    name: Run Model Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsndfile1 ffmpeg
+          
+      - name: Install python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt pytest jiwer
+          
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download Model and Test Audio from S3
+        run: |
+          mkdir -p /tmp/model
+          aws s3 cp s3://${{ env.S3_BUCKET_NAME }}/whisper_onnx_model/ /tmp/model/ --recursive
+          # We don't download test audio here specifically, the pytest fixture does it.
+          
+      - name: Run Pytest
+        run: |
+          pytest test_model.py -v
+
+  build_and_promote:
+    name: Build Docker Image and Push to ECR
+    runs-on: ubuntu-latest
+    needs: test_model
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine Environment
+        id: env_step
+        run: |
+          if [ "${{ github.ref_name }}" == "prod" ]; then
+            echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+          else
+            echo "ENVIRONMENT=dev" >> $GITHUB_ENV
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:${{ env.ENVIRONMENT }}-latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY --all-tags
+          
+      - name: Deploy to EC2
+        env:
+          EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          # Remember: EC2_SSH_PRIVATE_KEY and EC2_HOST must be added to repository secrets
+        run: |
+          echo "Deploying to ${{ env.ENVIRONMENT }} environment..."
+          
+          # Determine host port based on environment
+          if [ "${{ env.ENVIRONMENT }}" = "prod" ]; then
+            EXT_PORT=8000
+          else
+            EXT_PORT=8001
+          fi
+          
+          # Setup SSH key
+          mkdir -p ~/.ssh
+          echo "$EC2_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
+          
+          # We pass AWS credentials to login and pull image, then run mapping port $EXT_PORT
+          ssh ubuntu@$EC2_HOST "
+            export AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }}
+            export AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY }}
+            export AWS_REGION=${{ env.AWS_REGION }}
+            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin $ECR_REGISTRY &&
+            docker pull $ECR_REGISTRY/$ECR_REPOSITORY:${{ env.ENVIRONMENT }}-latest &&
+            docker stop whisper-api-${{ env.ENVIRONMENT }} || true &&
+            docker rm whisper-api-${{ env.ENVIRONMENT }} || true &&
+            docker run -d --name whisper-api-${{ env.ENVIRONMENT }} -p $EXT_PORT:8000 \
+              -e ENVIRONMENT=${{ env.ENVIRONMENT }} \
+              -e AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }} \
+              -e AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY }} \
+              -e AWS_REGION=${{ env.AWS_REGION }} \
+              -e S3_BUCKET_NAME=${{ env.S3_BUCKET_NAME }} \
+              $ECR_REGISTRY/$ECR_REPOSITORY:${{ env.ENVIRONMENT }}-latest
+          "
