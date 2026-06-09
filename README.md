@@ -8,6 +8,43 @@ Aunque en este caso se presenta bajo el contexto de **"LexScribe Jurídico"** (u
 
 El objetivo técnico de este sistema es exponer una API utilizando FastAPI que reciba archivos de audio `.wav` y retorne la transcripción generada por un modelo `whisper-base` pre-entrenado en formato ONNX. Adicionalmente, cuenta con un flujo CI/CD automatizado que valida la calidad y latencia del modelo, para luego desplegar la aplicación final en una instancia EC2 de AWS usando contenedores Docker de forma automática.
 
+## Arquitectura General de la Solución
+
+La solución implementa una arquitectura MLOps completa para el despliegue automatizado de un modelo Whisper ONNX utilizando AWS y GitHub Actions.
+
+### Flujo de Predicción
+
+Usuario
+→ Interfaz Web / API FastAPI
+→ Modelo Whisper ONNX (descargado dinámicamente desde Amazon S3)
+→ Generación de Transcripción
+→ Respuesta al Usuario
+→ Registro de Predicción en Amazon S3
+
+### Flujo de CI/CD
+
+Push a rama dev o prod
+→ GitHub Actions
+→ Descarga del modelo ONNX desde Amazon S3
+→ Descarga de datos de prueba desde Amazon S3
+→ Ejecución de pruebas automáticas (Inferencia, Latencia y WER)
+→ Construcción de imagen Docker
+→ Publicación en Amazon ECR
+→ Despliegue automático en Amazon EC2
+→ Actualización del endpoint correspondiente
+
+### Componentes Principales
+
+- GitHub: Control de versiones y gestión de ramas.
+- GitHub Actions: Automatización de pruebas y despliegues.
+- Amazon S3: Almacenamiento del modelo ONNX, datos de prueba y logs de predicciones.
+- FastAPI: Exposición del endpoint de inferencia.
+- Docker: Empaquetamiento de la aplicación.
+- Amazon ECR: Registro de imágenes de contenedores.
+- Amazon EC2: Hospedaje de los entornos dev y prod.
+- Whisper ONNX: Motor de transcripción de voz a texto.
+
+
 ## Estructura del Repositorio
 
 - **`app.py`**: Servidor FastAPI. Contiene el endpoint `/predict` y la lógica para descargar el modelo de S3 al arrancar, además de guardar logs de transcripción en S3.
