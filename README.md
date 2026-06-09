@@ -12,26 +12,46 @@ El objetivo técnico de este sistema es exponer una API utilizando FastAPI que r
 
 La solución implementa una arquitectura MLOps completa para el despliegue automatizado de un modelo Whisper ONNX utilizando AWS y GitHub Actions.
 
+
 ### Flujo de Predicción
 
+```text
 Usuario
-→ Interfaz Web / API FastAPI
-→ Modelo Whisper ONNX (descargado dinámicamente desde Amazon S3)
-→ Generación de Transcripción
-→ Respuesta al Usuario
-→ Registro de Predicción en Amazon S3
+   ↓
+Interfaz Web / API FastAPI
+   ↓
+Modelo Whisper ONNX
+(descargado dinámicamente desde Amazon S3)
+   ↓
+Generación de Transcripción
+   ↓
+Respuesta al Usuario
+   ↓
+Registro de Predicción en Amazon S3
+```
 
 ### Flujo de CI/CD
 
+```text
 Push a rama dev o prod
-→ GitHub Actions
-→ Descarga del modelo ONNX desde Amazon S3
-→ Descarga de datos de prueba desde Amazon S3
-→ Ejecución de pruebas automáticas (Inferencia, Latencia y WER)
-→ Construcción de imagen Docker
-→ Publicación en Amazon ECR
-→ Despliegue automático en Amazon EC2
-→ Actualización del endpoint correspondiente
+        ↓
+GitHub Actions
+        ↓
+Descarga del modelo ONNX desde Amazon S3
+        ↓
+Descarga de datos de prueba desde Amazon S3
+        ↓
+Ejecución de pruebas automáticas
+(Inferencia, Latencia y WER)
+        ↓
+Construcción de imagen Docker
+        ↓
+Publicación de imagen en Amazon ECR
+        ↓
+Despliegue automático en Amazon EC2
+        ↓
+Actualización del endpoint correspondiente
+```
 
 ### Componentes Principales
 
